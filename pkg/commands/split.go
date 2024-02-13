@@ -22,11 +22,11 @@ func SplitWithPrompt(path string) error {
 	if err != nil {
 		return err
 	}
-
-	return Split(path, filepath.Dir(path), total, threshold)
+	var horcruxNames []string
+	return Split(path, filepath.Dir(path), total, threshold, &horcruxNames)
 }
 
-func Split(path string, destination string, total int, threshold int) error {
+func Split(path string, destination string, total int, threshold int, horcruxNames *[]string) error {
 	key, err := generateKey()
 	if err != nil {
 		return err
@@ -79,6 +79,7 @@ func Split(path string, destination string, total int, threshold int) error {
 		originalFilenameWithoutExt := strings.TrimSuffix(originalFilename, filepath.Ext(originalFilename))
 		horcruxFilename := fmt.Sprintf("%s_%d_of_%d.horcrux", originalFilenameWithoutExt, index, total)
 		horcruxPath := filepath.Join(destination, horcruxFilename)
+		*horcruxNames = append(*horcruxNames, horcruxFilename)
 		fmt.Printf("creating %s\n", horcruxPath)
 
 		// clearing file in case it already existed
