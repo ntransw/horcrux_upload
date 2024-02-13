@@ -63,12 +63,12 @@ func splitAndUpload() {
 	}
 
 	fileSize := float64(fileInfo.Size()) / (1024.0 * 1024.0)
-	splitAmount := 1
+	splitAmount := 0
 	maxSize := 8
 	for {
 		splitAmount++
-		fileSize /= float64(splitAmount)
-		if fileSize <= float64(maxSize) {
+		tempSize := fileSize / float64(splitAmount)
+		if tempSize <= float64(maxSize) {
 			break
 		}
 	}
