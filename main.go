@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jesseduffield/horcrux/pkg/commands"
@@ -16,34 +18,97 @@ type Secrets struct {
 }
 
 func main() {
-	splitAndUpload()
+	var userChoice string
+
+	fmt.Print("Enter 1 for split + upload, 2 for download + bind: ")
+	fmt.Scanln(&userChoice)
+
+	if userChoice == "1" {
+		splitAndUpload()
+	} else if userChoice == "2" {
+		var userFile string
+		fmt.Print("Enter file name without extension for download: ")
+		fmt.Scanln(&userFile)
+
+		downloadAndBind(userFile)
+	}
 }
 
-func downloadAttachment(s *discordgo.Session, attachment *discordgo.MessageAttachment) {
-	// Create a new file to save the attachment
-	file, err := os.Create(attachment.Filename)
+func downloadAndBind(userInput string) {
+	var secrets Secrets
+	json_file, err := os.Open("secrets.json")
 	if err != nil {
-		fmt.Println("Error creating file:", err)
+		fmt.Println("Error opening JSON file:", err)
 		return
+	}
+
+	decoder := json.NewDecoder(json_file)
+	err = decoder.Decode(&secrets)
+	if err != nil {
+		fmt.Println("Error decoding JSON data:", err)
+		return
+	}
+
+	dg, err := discordgo.New("Bot " + secrets.TOKEN)
+	if err != nil {
+		fmt.Println("Error creating Discord session:", err)
+		return
+	}
+
+	messages, err := dg.ChannelMessages(secrets.CHANNEL_ID, 100, "", "", "")
+	if err != nil {
+		fmt.Println("Error fetching channel messages:", err)
+		return
+	}
+
+	for _, message := range messages {
+		for _, attachment := range message.Attachments {
+			if strings.Contains(attachment.Filename, userInput) {
+				err := downloadAttachment(attachment.URL, attachment.Filename)
+				if err != nil {
+					fmt.Println("Error downloading horcrux:", err)
+				} else {
+					fmt.Println("Attachment horcrux:", attachment.Filename)
+				}
+			}
+		}
+	}
+
+	paths, err := commands.GetHorcruxPathsInDir("./")
+	overwrite := true
+	if err != nil {
+		fmt.Println("Error getting horcrux paths: ", err)
+	}
+
+	if err := commands.Bind(paths, "", overwrite); err != nil {
+		fmt.Println("Error binding: ", err)
+	}
+
+	dg.Close()
+}
+
+func downloadAttachment(url, filename string) error {
+	// Open a file for writing the attachment.
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
 	}
 	defer file.Close()
 
-	// Download the attachment content
-	resp, err := s.Client.Get(attachment.URL)
+	// Get the attachment content.
+	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("Error downloading attachment:", err)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
-	// Copy the attachment content to the file
+	// Write the attachment content to the file.
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
-		fmt.Println("Error copying attachment content:", err)
-		return
+		return err
 	}
 
-	fmt.Printf("Attachment '%s' downloaded successfully.\n", attachment.Filename)
+	return nil
 }
 
 func splitAndUpload() {
@@ -76,13 +141,13 @@ func splitAndUpload() {
 	var horcruxNames []string
 	commands.Split(file_input, "./", splitAmount, splitAmount, &horcruxNames)
 
+	var secrets Secrets
 	json_file, err := os.Open("secrets.json")
 	if err != nil {
 		fmt.Println("Error opening JSON file:", err)
 		return
 	}
 
-	var secrets Secrets
 	decoder := json.NewDecoder(json_file)
 	err = decoder.Decode(&secrets)
 	if err != nil {
@@ -113,6 +178,8 @@ func splitAndUpload() {
 		if err != nil {
 			fmt.Println("Error sending file:", err)
 			return
+		} else {
+			fmt.Println("Uploading", value)
 		}
 	}
 
