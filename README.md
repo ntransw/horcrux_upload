@@ -12,6 +12,7 @@ requires a `secrets.json` file with a discord bot `TOKEN` and `CHANNEL_ID`:
 currently in a minimal working state but needs improvement  
 
 to-do:  
+- lots of general refactoring
 - handle many more input cases/errors
 - tests/pipeline
 - maybe a UI
